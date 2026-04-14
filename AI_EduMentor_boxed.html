@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI EduMentor — 지능형 학습 멘토 에이전트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════
+   0. DESIGN TOKENS
+══════════════════════════════════════════════════ */
+:root{
+  --ink:   #0c0e14;
+  --paper: #f5f3ee;
+  --paper2:#ece9e1;
+  --blue:  #1a4fff;
+  --blue-pale:#e8eeff;
+  --teal:  #00c2a8;
+  --warn:  #ff6b35;
+  --muted: #6b6b72;
+  --border:#dddad2;
+  --r:     12px;
+  --fko:   'Noto Sans KR',sans-serif;
+  --fmono: 'Space Mono',monospace;
+
+  /* simulator accent aliases */
+  --a1:#1a4fff;
+  --a2:#0891b2;
+  --a3:#7c3aed;
+  --a4:#059669;
+  --danger:#dc2626;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:var(--fko);
+  background:var(--paper);
+  color:var(--ink);
+  font-size:17px;
+  line-height:1.7;
+  overflow-x:hidden;
+}
+
+/* ── subtle grid bg ── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,0,0,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,0,0,.018) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+
+/* ── blink animation (shared) ── */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══════════════════════════════════════════════════
+   1. NAV
+══════════════════════════════════════════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:300;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.5rem;height:60px;
+  background:rgba(245,243,238,.93);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{
+  font-family:var(--fmono);font-size:.95rem;font-weight:700;
+  color:var(--ink);text-decoration:none;letter-spacing:-.02em;
+  flex-shrink:0;
+}
+.nav-logo span{color:var(--blue);}
+.nav-links{
+  display:flex;gap:1.5rem;list-style:none;
+  margin:0 1.5rem;
+}
+.nav-links a{
+  font-size:.82rem;font-weight:500;color:var(--muted);
+  text-decoration:none;transition:color .2s;white-space:nowrap;
+}
+.nav-links a:hover{color:var(--ink);}
+.nav-badge{
+  font-family:var(--fmono);font-size:.68rem;
+  background:var(--blue);color:#fff;
+  padding:.25rem .7rem;border-radius:999px;
+  flex-shrink:0;
+}
+@media(max-width:820px){
+  .nav-links{display:none;}
+  nav{padding:0 1rem;}
+}
+
+/* ══════════════════════════════════════════════════
+   2. STICKY SIM TOPBAR  (hidden until #simulator)
+══════════════════════════════════════════════════ */
+#simbar{
+  position:sticky;top:60px;z-index:200;
+  background:#fff;
+  border-bottom:2px solid var(--border);
+  box-shadow:0 2px 16px rgba(26,79,255,.07);
+  display:flex;align-items:center;gap:.8rem;
+  padding:0 1.25rem;height:60px;
+  display:none; /* shown only in sim section via JS */
+}
+.sb-brand{
+  display:flex;align-items:center;gap:.5rem;flex-shrink:0;
+}
+.sb-logo{font-family:var(--fmono);font-size:.9rem;font-weight:700;color:var(--blue);}
+.sb-badge{
+  font-family:var(--fmono);font-size:.58rem;
+  background:rgba(26,79,255,.08);border:1px solid rgba(26,79,255,.2);
+  color:var(--a2);padding:.18rem .5rem;border-radius:999px;
+  letter-spacing:.07em;text-transform:uppercase;
+}
+.sb-run-wrap{flex:1;display:flex;justify-content:center;}
+#btnRun{
+  display:inline-flex;align-items:center;gap:.55rem;
+  background:linear-gradient(135deg,var(--blue),var(--teal));
+  color:#fff;border:none;border-radius:10px;
+  padding:.7rem 2.2rem;
+  font-size:1rem;font-weight:900;letter-spacing:-.01em;
+  font-family:var(--fko);cursor:pointer;
+  box-shadow:0 4px 18px rgba(26,79,255,.28);
+  transition:all .25s;
+}
+#btnRun:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(26,79,255,.38);}
+#btnRun:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+#btnRun .spinner{
+  width:16px;height:16px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .6s linear infinite;display:none;
+}
+.running .spinner{display:block;}
+.sb-right{display:flex;align-items:center;gap:.4rem;flex-shrink:0;}
+.stu-btn{
+  padding:.45rem .9rem;border-radius:8px;
+  border:1.5px solid var(--border);
+  background:#fff;color:var(--ink);
+  cursor:pointer;font-size:.8rem;font-weight:500;
+  font-family:var(--fko);transition:all .2s;white-space:nowrap;
+}
+.stu-btn:hover{border-color:var(--blue);}
+.stu-btn.active{
+  border-color:var(--blue);background:rgba(26,79,255,.08);
+  color:var(--blue);font-weight:700;
+}
+#stuMobile{
+  display:none;
+  background:#fff;border-bottom:1px solid var(--border);
+  padding:.6rem 1rem;overflow-x:auto;white-space:nowrap;
+  gap:.45rem;position:sticky;top:114px;z-index:199;
+  scrollbar-width:none;
+}
+#stuMobile::-webkit-scrollbar{display:none;}
+#stuMobile .stu-btn{display:inline-flex;}
+@media(max-width:768px){
+  #simbar{height:54px;padding:0 .9rem;}
+  .sb-brand{display:none;}
+  .sb-right{display:none;}
+  #btnRun{padding:.62rem 1.5rem;font-size:.9rem;}
+}
+
+/* ══════════════════════════════════════════════════
+   3. COMMON LAYOUT
+══════════════════════════════════════════════════ */
+.container{max-width:1200px;margin:0 auto;}
+section{padding:5rem 1.5rem;position:relative;z-index:1;}
+@media(max-width:600px){section{padding:3.5rem 1rem;}}
+
+.section-label{
+  font-family:var(--fmono);font-size:.72rem;
+  color:var(--blue);letter-spacing:.1em;text-transform:uppercase;
+  margin-bottom:.65rem;
+}
+.section-title{
+  font-size:clamp(1.6rem,3.5vw,2.3rem);font-weight:900;
+  letter-spacing:-.03em;margin-bottom:.75rem;line-height:1.2;
+}
+.section-desc{
+  font-size:1rem;color:var(--muted);
+  max-width:560px;line-height:1.75;margin-bottom:0;
+}
+
+/* ══════════════════════════════════════════════════
+   4. HERO
+══════════════════════════════════════════════════ */
+.hero{
+  min-height:100vh;
+  display:grid;grid-template-columns:1fr 1fr;
+  align-items:center;
+  padding:6rem 1.5rem 4rem;
+  gap:3.5rem;
+  max-width:1200px;margin:0 auto;
+}
+@media(max-width:860px){.hero{grid-template-columns:1fr;padding-top:5rem;gap:2.5rem;}}
+
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-family:var(--fmono);font-size:.72rem;
+  color:var(--teal);letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:1.4rem;
+  background:rgba(0,194,168,.08);border:1px solid rgba(0,194,168,.3);
+  padding:.3rem .75rem;border-radius:999px;
+}
+.hero-eyebrow::before{
+  content:'';width:6px;height:6px;
+  background:var(--teal);border-radius:50%;animation:blink 1.4s infinite;
+}
+.hero h1{
+  font-size:clamp(2.2rem,5vw,3.5rem);font-weight:900;
+  line-height:1.14;letter-spacing:-.04em;margin-bottom:1.4rem;
+}
+.hero h1 em{font-style:normal;color:var(--blue);position:relative;}
+.hero h1 em::after{
+  content:'';position:absolute;bottom:2px;left:0;right:0;
+  height:4px;background:var(--blue);opacity:.16;border-radius:2px;
+}
+.hero-desc{
+  font-size:1rem;color:var(--muted);line-height:1.8;
+  max-width:480px;margin-bottom:2.2rem;
+}
+.hero-cta{display:flex;gap:.9rem;flex-wrap:wrap;}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:.45rem;
+  background:var(--ink);color:#fff;font-family:var(--fko);
+  font-weight:700;font-size:.95rem;
+  padding:.85rem 1.9rem;border-radius:var(--r);
+  text-decoration:none;border:none;cursor:pointer;
+  transition:background .2s,transform .15s;
+}
+.btn-primary:hover{background:var(--blue);transform:translateY(-1px);}
+.btn-secondary{
+  display:inline-flex;align-items:center;gap:.45rem;
+  background:transparent;color:var(--ink);
+  font-family:var(--fko);font-weight:500;font-size:.95rem;
+  padding:.85rem 1.65rem;border-radius:var(--r);
+  text-decoration:none;border:1.5px solid var(--border);
+  transition:border-color .2s,transform .15s;
+}
+.btn-secondary:hover{border-color:var(--ink);transform:translateY(-1px);}
+
+/* hero visual */
+.hero-visual{display:flex;flex-direction:column;gap:.9rem;animation:fadeUp .7s ease both .2s;}
+.stat-card{
+  background:#fff;border:1px solid var(--border);
+  border-radius:var(--r);padding:1.2rem 1.4rem;
+  position:relative;overflow:hidden;
+}
+.stat-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.stat-card.c-blue::before{background:var(--blue);}
+.stat-card.c-teal::before{background:var(--teal);}
+.stat-card.c-warn::before{background:var(--warn);}
+.stat-label{
+  font-size:.72rem;font-weight:500;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;
+}
+.stat-number{
+  font-family:var(--fmono);font-size:2rem;font-weight:700;
+  color:var(--ink);line-height:1;
+}
+.stat-sub{font-size:.8rem;color:var(--muted);margin-top:.25rem;}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;}
+
+/* ══════════════════════════════════════════════════
+   5. PROBLEM (dark bg)
+══════════════════════════════════════════════════ */
+.problem-bg{background:var(--ink);color:var(--paper);}
+.problem-bg .section-label{color:var(--warn);}
+.problem-bg .section-title{color:var(--paper);}
+.problem-bg .section-desc{color:rgba(245,243,238,.6);}
+
+.dropout-table{width:100%;border-collapse:collapse;margin-top:2.2rem;font-size:.9rem;}
+.dropout-table th{
+  background:rgba(255,255,255,.06);color:rgba(245,243,238,.5);
+  font-family:var(--fmono);font-size:.7rem;letter-spacing:.05em;
+  text-transform:uppercase;padding:.7rem 1rem;text-align:left;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.dropout-table td{
+  padding:.85rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);
+  color:rgba(245,243,238,.85);
+}
+.dropout-table tr:hover td{background:rgba(255,255,255,.03);}
+.rate-bar{display:flex;align-items:center;gap:.6rem;}
+.rate-track{flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;}
+.rate-fill{height:100%;background:var(--warn);border-radius:999px;}
+
+.problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.5rem;}
+@media(max-width:700px){.problem-grid{grid-template-columns:1fr;}}
+.problem-card{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:var(--r);padding:1.4rem;
+}
+.problem-card .icon{font-size:1.5rem;margin-bottom:.65rem;}
+.problem-card h4{font-size:1rem;font-weight:700;color:var(--paper);margin-bottom:.4rem;}
+.problem-card p{font-size:.85rem;color:rgba(245,243,238,.55);line-height:1.6;}
+
+/* ══════════════════════════════════════════════════
+   6. HOW IT WORKS pipeline (landing style)
+══════════════════════════════════════════════════ */
+.how-bg{background:var(--paper2);}
+.land-pipeline{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:0;margin-top:2.5rem;
+  border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;background:#fff;
+}
+.pipe-step{padding:1.6rem 1.4rem;border-right:1px solid var(--border);}
+.pipe-step:last-child{border-right:none;}
+.pipe-num{
+  font-family:var(--fmono);font-size:.7rem;color:var(--blue);
+  font-weight:700;margin-bottom:.55rem;letter-spacing:.05em;
+}
+.pipe-step h4{font-size:1rem;font-weight:700;margin-bottom:.45rem;color:var(--ink);}
+.pipe-step p{font-size:.85rem;color:var(--muted);line-height:1.6;}
+.pipe-tag{
+  display:inline-block;margin-top:.65rem;padding:.2rem .55rem;
+  background:var(--blue-pale);color:var(--blue);
+  font-size:.7rem;font-weight:600;border-radius:6px;
+}
+@media(max-width:860px){
+  .land-pipeline{grid-template-columns:1fr 1fr;}
+  .pipe-step:nth-child(2){border-right:none;}
+  .pipe-step:nth-child(3){border-top:1px solid var(--border);}
+  .pipe-step:nth-child(4){border-top:1px solid var(--border);border-right:none;}
+}
+@media(max-width:480px){
+  .land-pipeline{grid-template-columns:1fr;}
+  .pipe-step{border-right:none !important;border-bottom:1px solid var(--border);}
+  .pipe-step:last-child{border-bottom:none;}
+}
+
+/* ══════════════════════════════════════════════════
+   7. FEATURES
+══════════════════════════════════════════════════ */
+.features-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);
+  gap:1.1rem;margin-top:2.5rem;
+}
+@media(max-width:700px){.features-grid{grid-template-columns:1fr;}}
+.feature-card{
+  background:#fff;border:1px solid var(--border);
+  border-radius:var(--r);padding:1.6rem;
+  transition:box-shadow .2s,transform .2s;
+}
+.feature-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.08);transform:translateY(-2px);}
+.feature-card.featured{
+  grid-column:span 2;
+  display:grid;grid-template-columns:1fr 1.2fr;gap:1.8rem;align-items:center;
+  background:var(--ink);color:var(--paper);border-color:transparent;
+}
+@media(max-width:700px){
+  .feature-card.featured{grid-column:1;grid-template-columns:1fr;}
+}
+.feature-icon{
+  width:42px;height:42px;border-radius:10px;
+  background:var(--blue-pale);
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  margin-bottom:.9rem;
+}
+.feature-card.featured .feature-icon{background:rgba(255,255,255,.1);}
+.feature-card h3{font-size:1.05rem;font-weight:700;margin-bottom:.45rem;}
+.feature-card.featured h3{color:var(--paper);}
+.feature-card p{font-size:.87rem;color:var(--muted);line-height:1.65;}
+.feature-card.featured p{color:rgba(245,243,238,.6);}
+.mini-dash{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;padding:1.1rem;
+}
+.mini-dash .dash-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:.8rem;
+}
+.mini-dash .dash-row:last-child{border-bottom:none;}
+.risk-pill{
+  padding:.15rem .5rem;border-radius:999px;
+  font-size:.68rem;font-weight:700;
+}
+.risk-pill.rp-high{background:rgba(255,107,53,.25);color:#ffaa8a;}
+.risk-pill.rp-mid {background:rgba(255,200,0,.2); color:#ffe57a;}
+.risk-pill.rp-low {background:rgba(0,194,168,.2);  color:#7fe8de;}
+.score-bar{width:60px;height:4px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;}
+.score-fill{height:100%;border-radius:999px;}
+
+/* ══════════════════════════════════════════════════
+   8. SIMULATOR SECTION  ← 핵심
+/* ── sim wrapper (공통) ── */
+.sim-wrap{max-width:1200px;margin:0 auto;}
+
+/* ══════════════════════════════
+   ★ SIM BOX — 박스 컨테이너
+══════════════════════════════ */
+.sim-box{
+  background:var(--ink);
+  border-radius:20px;
+  border:1.5px solid rgba(255,255,255,.1);
+  box-shadow:
+    0 0 0 1px rgba(26,79,255,.15),
+    0 8px 48px rgba(0,0,0,.35),
+    0 2px 8px rgba(0,0,0,.2);
+  overflow:hidden;
+  margin-top:2rem;
+}
+
+/* 박스 상단 컨트롤 바 */
+.sim-box-bar{
+  background:rgba(255,255,255,.04);
+  border-bottom:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;gap:.8rem;
+  padding:.85rem 1.4rem;
+  flex-wrap:wrap;
+  gap:.7rem;
+}
+.sim-box-dots{
+  display:flex;gap:6px;align-items:center;flex-shrink:0;
+}
+.sim-box-dot{
+  width:12px;height:12px;border-radius:50%;
+}
+.sim-box-dot.red   {background:#ff5f56;}
+.sim-box-dot.yellow{background:#ffbd2e;}
+.sim-box-dot.green {background:#27c93f;}
+
+.sim-box-title{
+  font-family:var(--fmono);font-size:.75rem;
+  color:rgba(255,255,255,.35);letter-spacing:.08em;
+  flex-shrink:0;
+}
+
+/* 박스 안 학습자 탭 */
+.sim-box-tabs{
+  display:flex;gap:.4rem;flex-wrap:wrap;
+}
+.sim-box-tabs .stu-btn{
+  background:rgba(255,255,255,.07);
+  border-color:rgba(255,255,255,.12);
+  color:rgba(255,255,255,.65);
+  font-size:.78rem;
+}
+.sim-box-tabs .stu-btn:hover{
+  border-color:var(--teal);
+  background:rgba(0,194,168,.12);
+  color:var(--teal);
+}
+.sim-box-tabs .stu-btn.active{
+  border-color:var(--teal);
+  background:rgba(0,194,168,.15);
+  color:var(--teal);font-weight:700;
+}
+
+/* 박스 안 실행 버튼 */
+#btnRunBox{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:linear-gradient(135deg,var(--blue),var(--teal));
+  color:#fff;border:none;border-radius:9px;
+  padding:.6rem 1.8rem;
+  font-size:.9rem;font-weight:900;
+  font-family:var(--fko);cursor:pointer;
+  box-shadow:0 3px 14px rgba(26,79,255,.3);
+  transition:all .22s;
+  margin-left:auto;
+  flex-shrink:0;
+}
+#btnRunBox:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(26,79,255,.45);}
+#btnRunBox:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+#btnRunBox .spinner{
+  width:15px;height:15px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .6s linear infinite;display:none;
+}
+.running2 .spinner{display:block;}
+
+@media(max-width:600px){
+  .sim-box-bar{padding:.7rem 1rem;}
+  .sim-box-title{display:none;}
+  #btnRunBox{padding:.55rem 1.3rem;font-size:.83rem;margin-left:0;width:100%;justify-content:center;}
+  .sim-box-tabs{width:100%;}
+  .sim-box-tabs .stu-btn{flex:1;text-align:center;}
+}
+
+/* 박스 안쪽 패딩 영역 */
+.sim-box-body{
+  padding:1.5rem 1.4rem 1.75rem;
+}
+@media(max-width:600px){.sim-box-body{padding:1rem .85rem 1.25rem;}}
+
+/* 박스 안 카드/패널 색상 오버라이드 */
+.sim-box .stu-card{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(255,255,255,.1);
+}
+.sim-box .stu-card .stu-info h3{color:#fff;}
+.sim-box .stu-card .stu-info p{color:rgba(245,243,238,.5);}
+
+.sim-box .smc{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(255,255,255,.09);
+}
+.sim-box .smc-lbl{color:rgba(245,243,238,.4);}
+.sim-box .smc-sub{color:rgba(245,243,238,.38);}
+
+.sim-box .sps{
+  background:rgba(255,255,255,.05);
+  border-color:rgba(255,255,255,.1);
+}
+.sim-box .sps-num{color:rgba(245,243,238,.35);}
+.sim-box .sps-title{color:#fff;}
+.sim-box .sps-title small{color:rgba(245,243,238,.4);}
+.sim-box .sps-items li{color:rgba(245,243,238,.5);}
+.sim-box .sps-items li::before{color:var(--blue);}
+.sim-box .sps.active{
+  border-color:var(--blue);
+  background:linear-gradient(135deg,rgba(26,79,255,.12),rgba(0,194,168,.04));
+  box-shadow:0 2px 18px rgba(26,79,255,.2);
+}
+.sim-box .sps.active .sps-items li{color:rgba(255,255,255,.85);}
+.sim-box .sps.done{border-color:var(--teal);background:rgba(0,194,168,.06);}
+.sim-box .sps.done .sps-items li::before{color:var(--teal);}
+.sim-box .sps:not(:last-child)::after{color:rgba(255,255,255,.2);}
+
+.sim-box .spanel{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(255,255,255,.1);
+}
+.sim-box .col-kakao .spanel{
+  border-color:rgba(0,194,168,.28);
+  box-shadow:0 4px 22px rgba(0,194,168,.1);
+}
+.sim-box .spanel-title{color:rgba(245,243,238,.45);}
+.sim-box .prog-lbl{color:rgba(245,243,238,.7);}
+.sim-box .prog-track{background:rgba(255,255,255,.08);}
+.sim-box .ivc{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.09);
+}
+.sim-box .ivc h4{color:#fff;}
+.sim-box .ivc p{color:rgba(245,243,238,.45);}
+.sim-box .ivc.selected{
+  border-color:var(--teal);
+  background:rgba(0,194,168,.08);
+}
+.sim-box .ivc:hover{border-color:var(--blue);background:rgba(26,79,255,.08);}
+
+.sim-box .terminal{
+  background:rgba(0,0,0,.4);
+  border-color:rgba(255,255,255,.07);
+}
+.sim-box .log-msg{color:rgba(245,243,238,.75);}
+.sim-box .log-time{color:rgba(255,255,255,.25);}
+
+.sim-box .is-title{color:rgba(245,243,238,.4);}
+.sim-box .is-row{
+  border-bottom-color:rgba(255,255,255,.07);
+  color:rgba(245,243,238,.7);
+}
+.sim-box .is-val{color:var(--teal);}
+
+.sim-box .result-panel{
+  background:rgba(255,255,255,.07);
+  border-color:var(--teal);
+}
+.sim-box .result-panel h3{color:var(--teal);}
+.sim-box .res-item{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(255,255,255,.08);
+}
+.sim-box .res-k{color:rgba(245,243,238,.45);}
+.sim-box .res-v{color:var(--teal);}
+.sim-box .spanel-title[style]{color:rgba(245,243,238,.45);}
+
+/* 섹션 배경을 paper2에서 기본으로 */
+#simulator.how-bg{background:var(--paper2);}
+
+/* ── 모바일: 학습자 카드 risk badge 줄바꿈 처리 ── */
+@media(max-width:480px){
+  .stu-card{gap:.75rem;}
+  .s-risk-badge{margin-left:0;width:100%;text-align:center;}
+}
+
+/* ── 모바일: 메트릭 480px 이하 2열, 360px 이하 1열 ── */
+@media(max-width:360px){.sim-metrics{grid-template-columns:1fr;}}
+
+/* ── 모바일: sim-grid 완전 1열 ── */
+@media(max-width:580px){
+  .sim-grid{grid-template-columns:1fr !important;}
+  .col-kakao{order:-2;}
+  .col-log  {order:-1;}
+  .col-analysis{order:0;}
+}
+
+/* ── 모바일: 파이프라인 화살표 숨김 & 2열 ── */
+@media(max-width:480px){
+  .sim-pipeline{grid-template-columns:1fr 1fr !important;}
+}
+@media(max-width:340px){
+  .sim-pipeline{grid-template-columns:1fr !important;}
+}
+
+/* ── 모바일: 터미널 높이 축소 ── */
+@media(max-width:580px){
+  .terminal{height:180px;}
+}
+
+/* ── 모바일: 결과 그리드 ── */
+@media(max-width:480px){
+  #resultGrid{grid-template-columns:1fr !important;}
+}
+
+/* student card */
+.stu-card{
+  background:#fff;border:1.5px solid var(--border);
+  border-radius:var(--r);padding:1rem 1.3rem;
+  margin-bottom:1.2rem;
+  display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+  box-shadow:0 2px 12px rgba(26,79,255,.06);
+}
+.stu-avatar{
+  width:52px;height:52px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--blue),var(--a3));
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.stu-info h3{font-size:1.05rem;font-weight:700;}
+.stu-info p{font-size:.85rem;color:var(--muted);margin-top:.15rem;}
+.s-risk-badge{
+  margin-left:auto;padding:.45rem .9rem;border-radius:8px;
+  font-size:.85rem;font-weight:700;font-family:var(--fmono);
+}
+.s-risk-high{background:rgba(220,38,38,.08);color:var(--danger);border:1.5px solid rgba(220,38,38,.22);}
+.s-risk-mid {background:rgba(255,107,53,.08);color:var(--warn);  border:1.5px solid rgba(255,107,53,.22);}
+.s-risk-low {background:rgba(0,194,168,.08); color:#007a68;      border:1.5px solid rgba(0,194,168,.22);}
+
+/* metrics */
+.sim-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.3rem;}
+@media(max-width:480px){.sim-metrics{grid-template-columns:1fr 1fr;}}
+.smc{
+  background:#fff;border:1.5px solid var(--border);
+  border-radius:var(--r);padding:1rem 1.1rem;
+  position:relative;overflow:hidden;
+  box-shadow:0 1px 5px rgba(0,0,0,.04);
+  transition:border-color .2s;
+}
+.smc:hover{border-color:var(--blue);}
+.smc-lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;font-weight:600;}
+.smc-val{font-size:1.8rem;font-weight:900;font-family:var(--fmono);line-height:1;}
+.smc-sub{font-size:.78rem;color:var(--muted);margin-top:.35rem;}
+.smc-ico{position:absolute;top:.9rem;right:.9rem;font-size:1.2rem;}
+.cv-red   {color:var(--danger);}
+.cv-yellow{color:var(--warn);}
+.cv-green {color:#007a68;}
+.cv-blue  {color:var(--blue);}
+
+/* simulator pipeline */
+.sim-pipeline{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  margin-bottom:1.4rem;gap:0;
+}
+@media(max-width:680px){.sim-pipeline{grid-template-columns:1fr 1fr;gap:.7rem;}}
+.sps{
+  background:#fff;border:1.5px solid var(--border);
+  padding:1.1rem 1rem;position:relative;cursor:default;
+  transition:all .3s;
+}
+.sps:first-child{border-radius:var(--r) 0 0 var(--r);}
+.sps:last-child {border-radius:0 var(--r) var(--r) 0;}
+@media(max-width:680px){.sps,.sps:first-child,.sps:last-child{border-radius:var(--r);}}
+.sps:not(:last-child)::after{
+  content:'→';position:absolute;right:-13px;top:50%;transform:translateY(-50%);
+  font-size:1rem;color:var(--muted);z-index:2;
+}
+@media(max-width:680px){.sps::after{display:none;}}
+.sps.active{
+  border-color:var(--blue);
+  background:linear-gradient(135deg,rgba(26,79,255,.06),rgba(0,194,168,.03));
+  box-shadow:0 2px 18px rgba(26,79,255,.12);
+}
+.sps.done{border-color:var(--teal);background:rgba(0,194,168,.03);}
+.sps-num{
+  font-family:var(--fmono);font-size:.63rem;font-weight:700;
+  color:var(--muted);letter-spacing:.08em;margin-bottom:.5rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+.sps-dot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0;}
+.active .sps-dot{background:var(--blue);box-shadow:0 0 8px rgba(26,79,255,.45);animation:blink 1s infinite;}
+.done   .sps-dot{background:var(--teal);}
+.sps-title{font-size:.95rem;font-weight:700;margin-bottom:.5rem;color:var(--ink);}
+.sps-title small{display:block;font-size:.72rem;color:var(--muted);font-weight:400;margin-top:.12rem;}
+.sps-items{list-style:none;}
+.sps-items li{
+  font-size:.8rem;color:var(--muted);padding:.22rem 0;
+  display:flex;align-items:flex-start;gap:.4rem;line-height:1.5;
+}
+.sps-items li::before{content:'•';color:var(--blue);flex-shrink:0;margin-top:.05rem;}
+.active .sps-items li{color:var(--ink);}
+.done   .sps-items li::before{color:var(--teal);}
+
+/* main 3-col */
+.sim-grid{
+  display:grid;
+  grid-template-columns:1fr 1.1fr 1fr;
+  gap:.95rem;margin-bottom:1.3rem;align-items:start;
+}
+@media(max-width:940px){
+  .sim-grid{grid-template-columns:1fr 1fr;}
+  .col-kakao{grid-column:1/-1;}
+}
+@media(max-width:580px){
+  .sim-grid{grid-template-columns:1fr;}
+  .col-kakao  {order:-2;}
+  .col-log    {order:-1;}
+  .col-analysis{order:0;}
+}
+
+.spanel{
+  background:#fff;border:1.5px solid var(--border);
+  border-radius:var(--r);padding:1.15rem;overflow:hidden;
+  box-shadow:0 1px 5px rgba(0,0,0,.04);
+}
+.spanel-title{
+  font-size:.75rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--muted);
+  margin-bottom:.9rem;display:flex;align-items:center;gap:.45rem;
+}
+.spbar{width:3px;height:13px;border-radius:2px;flex-shrink:0;}
+.spbar-blue  {background:var(--blue);}
+.spbar-cyan  {background:var(--a2);}
+.spbar-purple{background:var(--a3);}
+.spbar-teal  {background:var(--teal);}
+
+/* progress bars */
+.prog-row{margin-bottom:.9rem;}
+.prog-lbl{display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:.4rem;color:var(--ink);}
+.prog-lbl span:last-child{font-family:var(--fmono);font-weight:700;}
+.prog-track{height:7px;background:var(--paper2);border-radius:999px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:999px;transition:width 1s ease;}
+.fill-blue  {background:linear-gradient(90deg,var(--blue),var(--teal));}
+.fill-purple{background:linear-gradient(90deg,var(--a3),var(--blue));}
+.fill-red   {background:linear-gradient(90deg,var(--danger),#f97316);}
+.fill-teal  {background:linear-gradient(90deg,var(--teal),var(--a2));}
+
+/* intervention cards */
+.ivc{
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:.85rem;margin-bottom:.55rem;cursor:pointer;
+  transition:all .2s;background:#fff;
+}
+.ivc:hover{border-color:var(--blue);background:rgba(26,79,255,.03);}
+.ivc.selected{border-color:var(--teal);background:rgba(0,194,168,.04);}
+.ivc h4{font-size:.9rem;font-weight:700;margin-bottom:.22rem;}
+.ivc p {font-size:.8rem;color:var(--muted);line-height:1.5;}
+.ivc-tag{
+  display:inline-block;font-size:.67rem;padding:.18rem .5rem;
+  border-radius:4px;margin-top:.4rem;font-family:var(--fmono);
+}
+
+/* kakao (center col) */
+.col-kakao .spanel{
+  border-color:rgba(26,79,255,.22);
+  box-shadow:0 4px 22px rgba(26,79,255,.09);
+}
+.kakao-wrap{
+  background:#fffde7;border:1.5px solid #fde68a;
+  border-radius:12px;padding:.95rem;
+}
+.kakao-hd{display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem;}
+.kakao-ico{
+  width:38px;height:38px;background:#fee500;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+  box-shadow:0 2px 8px rgba(254,229,0,.35);flex-shrink:0;
+}
+.kakao-sender{font-size:.9rem;font-weight:700;color:#1a1a1a;}
+.kakao-time  {font-size:.73rem;color:var(--muted);}
+.kakao-bubble{
+  background:#fff;color:#111;
+  border-radius:0 12px 12px 12px;
+  padding:.85rem .95rem;
+  font-size:.92rem;line-height:1.78;
+  box-shadow:0 2px 7px rgba(0,0,0,.07);
+  min-height:72px;
+}
+.kakao-bubble strong{color:var(--blue);}
+.kakao-btn{
+  margin-top:.7rem;background:#fee500;color:#111;border:none;
+  border-radius:8px;padding:.7rem;font-size:.9rem;font-weight:700;
+  cursor:pointer;font-family:var(--fko);width:100%;transition:opacity .2s;
+}
+.kakao-btn:hover{opacity:.85;}
+.int-summary{margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--border);}
+.is-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.55rem;}
+.is-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.32rem 0;border-bottom:1px solid var(--border);font-size:.85rem;
+}
+.is-row:last-child{border-bottom:none;}
+.is-val{font-family:var(--fmono);font-weight:700;color:#007a68;}
+
+/* terminal */
+.terminal{
+  background:#f8faff;border:1.5px solid var(--border);
+  border-radius:10px;padding:.85rem;height:240px;overflow-y:auto;
+  font-family:var(--fmono);font-size:.76rem;line-height:1.85;
+}
+.terminal::-webkit-scrollbar{width:4px;}
+.terminal::-webkit-scrollbar-thumb{background:#c7d2e8;border-radius:4px;}
+.log-line{display:flex;gap:.45rem;align-items:flex-start;flex-wrap:wrap;}
+.log-time{color:#94a3b8;flex-shrink:0;font-size:.68rem;margin-top:.12rem;}
+.log-tag{padding:.18rem .48rem;border-radius:4px;font-size:.63rem;flex-shrink:0;font-weight:700;}
+.log-p {background:rgba(26,79,255,.1); color:var(--blue);}
+.log-r {background:rgba(124,58,237,.1);color:var(--a3);}
+.log-pl{background:rgba(8,145,178,.1); color:var(--a2);}
+.log-a {background:rgba(0,194,168,.12);color:#007a68;}
+.log-w {background:rgba(220,38,38,.1); color:var(--danger);}
+.log-msg{color:var(--ink);font-size:.75rem;word-break:break-all;}
+
+/* result panel */
+.result-panel{
+  display:none;
+  background:#fff;border:1.5px solid var(--teal);
+  border-radius:var(--r);padding:1.4rem;margin-top:.9rem;
+  box-shadow:0 4px 22px rgba(0,194,168,.08);
+}
+.result-panel.show{display:block;animation:fadeUp .45s ease;}
+.result-panel h3{font-size:1.05rem;font-weight:700;margin-bottom:1rem;color:#007a68;}
+#resultGrid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.1rem;}
+@media(max-width:480px){#resultGrid{grid-template-columns:1fr;}}
+.res-item{background:var(--paper2);border-radius:10px;padding:.85rem;border:1px solid var(--border);}
+.res-k{font-size:.76rem;color:var(--muted);margin-bottom:.35rem;}
+.res-v{font-size:1.2rem;font-weight:700;font-family:var(--fmono);color:#007a68;}
+.action-chips{display:flex;flex-wrap:wrap;gap:.55rem;}
+.chip{padding:.45rem .9rem;border-radius:8px;font-size:.83rem;font-weight:500;border:1.5px solid;}
+.chip-blue  {background:rgba(26,79,255,.07); color:var(--blue);  border-color:rgba(26,79,255,.2);}
+.chip-teal  {background:rgba(0,194,168,.07); color:#007a68;      border-color:rgba(0,194,168,.2);}
+.chip-purple{background:rgba(124,58,237,.07);color:var(--a3);    border-color:rgba(124,58,237,.2);}
+.chip-yellow{background:rgba(255,107,53,.07);color:var(--warn);  border-color:rgba(255,107,53,.2);}
+
+/* ══════════════════════════════════════════════════
+   9. PILOT
+══════════════════════════════════════════════════ */
+.pilot-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1.1rem;margin-top:2.2rem;
+}
+@media(max-width:640px){.pilot-grid{grid-template-columns:1fr;}}
+.pilot-card{
+  background:#fff;border:1px solid var(--border);
+  border-radius:var(--r);padding:1.6rem;
+}
+.pilot-card-lbl{
+  font-family:var(--fmono);font-size:.7rem;color:var(--muted);
+  margin-bottom:.85rem;text-transform:uppercase;letter-spacing:.05em;
+}
+.pilot-table{width:100%;border-collapse:collapse;font-size:.9rem;}
+.pilot-table td{padding:.6rem 0;border-bottom:1px solid var(--border);}
+.pilot-table tr:last-child td{border-bottom:none;}
+.pilot-table td:first-child{color:var(--muted);width:45%;}
+.pilot-table td:last-child{font-weight:700;}
+
+/* ══════════════════════════════════════════════════
+   10. ROADMAP
+══════════════════════════════════════════════════ */
+.roadmap-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:1.1rem;margin-top:2.2rem;
+}
+@media(max-width:860px){.roadmap-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.roadmap-grid{grid-template-columns:1fr;}}
+.roadmap-card{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:#fff;}
+.roadmap-head{
+  padding:.9rem 1.2rem;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:.6rem;
+}
+.roadmap-num{
+  font-family:var(--fmono);font-size:.68rem;font-weight:700;
+  background:var(--ink);color:#fff;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border-radius:6px;flex-shrink:0;
+}
+.roadmap-card:nth-child(1) .roadmap-num{background:var(--blue);}
+.roadmap-card:nth-child(2) .roadmap-num{background:var(--teal);}
+.roadmap-card:nth-child(3) .roadmap-num{background:var(--warn);}
+.roadmap-card:nth-child(4) .roadmap-num{background:var(--a3);}
+.roadmap-head span:first-of-type{font-size:.92rem;font-weight:700;}
+.roadmap-period{
+  font-family:var(--fmono);font-size:.68rem;color:var(--muted);
+  margin-left:auto;flex-shrink:0;
+}
+.roadmap-body{padding:1.1rem 1.2rem;}
+.roadmap-body ul{list-style:none;}
+.roadmap-body li{
+  font-size:.85rem;color:var(--muted);padding:.28rem 0;
+  display:flex;gap:.5rem;align-items:flex-start;
+}
+.roadmap-body li::before{content:'—';color:var(--border);flex-shrink:0;}
+
+/* ══════════════════════════════════════════════════
+   11. POLICY
+══════════════════════════════════════════════════ */
+.policy-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.2rem;}
+@media(max-width:700px){.policy-grid{grid-template-columns:1fr;}}
+.policy-card{
+  border:1px solid var(--border);border-radius:var(--r);
+  padding:1.4rem;background:#fff;
+}
+.policy-card .tag{
+  display:inline-block;font-size:.7rem;font-weight:700;
+  background:var(--blue-pale);color:var(--blue);
+  padding:.18rem .55rem;border-radius:6px;margin-bottom:.7rem;
+}
+.policy-card h4{font-size:.98rem;font-weight:700;margin-bottom:.45rem;}
+.policy-card p{font-size:.85rem;color:var(--muted);line-height:1.6;}
+
+/* ══════════════════════════════════════════════════
+   12. GOVERNANCE
+══════════════════════════════════════════════════ */
+.gov-bg{background:var(--ink);color:var(--paper);}
+.gov-bg .section-label{color:var(--teal);}
+.gov-bg .section-title{color:var(--paper);}
+.gov-bg .section-desc{color:rgba(245,243,238,.6);}
+.checklist{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1.1rem;margin-top:2.2rem;
+}
+@media(max-width:640px){.checklist{grid-template-columns:1fr;}}
+.check-item{
+  display:flex;gap:1rem;align-items:flex-start;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--r);padding:1.25rem 1.3rem;
+}
+.check-icon{
+  width:28px;height:28px;border-radius:8px;flex-shrink:0;
+  background:rgba(0,194,168,.2);color:var(--teal);
+  display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;
+}
+.check-item h5{font-size:.95rem;font-weight:700;color:var(--paper);margin-bottom:.3rem;}
+.check-item p {font-size:.83rem;color:rgba(245,243,238,.55);line-height:1.6;}
+
+/* ══════════════════════════════════════════════════
+   13. CTA
+══════════════════════════════════════════════════ */
+.cta-section{background:var(--paper2);text-align:center;}
+.cta-section .section-label{justify-content:center;display:flex;}
+.cta-section .section-desc{margin:0 auto 2rem;}
+.cta-btns{display:flex;gap:.9rem;justify-content:center;flex-wrap:wrap;}
+
+/* ══════════════════════════════════════════════════
+   14. FOOTER
+══════════════════════════════════════════════════ */
+footer{
+  background:var(--ink);color:rgba(245,243,238,.4);
+  text-align:center;padding:2.5rem 1.5rem;
+  font-family:var(--fmono);font-size:.72rem;line-height:1.9;
+}
+footer strong{color:rgba(245,243,238,.7);}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════
+     NAV
+════════════════════════════════ -->
+<nav>
+  <a class="nav-logo" href="#">AI <span>EduMentor</span></a>
+  <ul class="nav-links">
+    <li><a href="#problem">현황</a></li>
+    <li><a href="#how">작동방식</a></li>
+    <li><a href="#features">기능</a></li>
+    <li><a href="#roadmap">로드맵</a></li>
+    <li><a href="#governance">거버넌스</a></li>
+    <li><a href="#simulator" style="color:var(--teal);font-weight:700;">▶ 시뮬레이터</a></li>
+  </ul>
+  <span class="nav-badge">과기부 공모전 2026</span>
+</nav>
+
+<!-- ════════════════════════════════
+     STICKY SIMBAR (▶ 실행 버튼 상단)
+     (IntersectionObserver로 표시)
+════════════════════════════════ -->
+<div id="simbar">
+  <div class="sb-brand">
+    <span class="sb-logo">AI EduMentor</span>
+    <span class="sb-badge">시뮬레이터</span>
+  </div>
+  <div class="sb-run-wrap">
+    <button id="btnRun" onclick="runSim()">
+      <div class="spinner"></div>
+      <span id="btnText">▶ 에이전트 사이클 실행</span>
+    </button>
+  </div>
+  <div class="sb-right">
+    <div id="stuTabsDesktop" style="display:flex;gap:.4rem;">
+      <button class="stu-btn active" onclick="selectStu(0,this)">😔 김민준</button>
+      <button class="stu-btn"        onclick="selectStu(1,this)">😐 이서연</button>
+      <button class="stu-btn"        onclick="selectStu(2,this)">😊 박지호</button>
+    </div>
+  </div>
+</div>
+
+<!-- mobile student tabs (below simbar) -->
+<div id="stuMobile">
+  <button class="stu-btn active" onclick="selectStuAll(0,this)">😔 김민준 (이탈 위험)</button>
+  <button class="stu-btn"        onclick="selectStuAll(1,this)">😐 이서연 (학습 정체)</button>
+  <button class="stu-btn"        onclick="selectStuAll(2,this)">😊 박지호 (우수 진행)</button>
+</div>
+
+<!-- ════════════════════════════════
+     HERO
+════════════════════════════════ -->
+<div style="position:relative;z-index:1;">
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">K-Digital Training · 내일배움카드</div>
+      <h1>학습 포기 전에<br><em>먼저 개입</em>하는<br>AI 멘토</h1>
+      <p class="hero-desc">
+        행동 데이터 기반 위험 탐지로 중도탈락을 예방합니다.<br>
+        규칙 엔진 + 머신러닝 + 인간 코치의 3단계 개입으로<br>완주율과 훈련 성과를 높입니다.
+      </p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="#simulator">▶ 에이전트 직접 체험하기</a>
+        <a class="btn-secondary" href="#how">작동 방식 보기</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="stat-row">
+        <div class="stat-card c-warn">
+          <div class="stat-label">2024 중도탈락</div>
+          <div class="stat-number">3,485<span style="font-size:1rem">명</span></div>
+          <div class="stat-sub">전년 대비 40.6% 증가</div>
+        </div>
+        <div class="stat-card c-blue">
+          <div class="stat-label">KDT 예산 규모</div>
+          <div class="stat-number">4,781<span style="font-size:1rem">억</span></div>
+          <div class="stat-sub">2025년 훈련 45,125명</div>
+        </div>
+      </div>
+      <div class="stat-card c-teal">
+        <div class="stat-label">목표 수료율</div>
+        <div class="stat-number" style="color:var(--teal)">85%<span style="font-size:1rem;color:var(--muted);font-family:var(--fko);"> 이상</span></div>
+        <div class="stat-sub">현재 약 79% → 행동 기반 선제 개입으로 달성</div>
+      </div>
+      <div class="stat-card">
+        <div style="display:flex;align-items:center;gap:.65rem;">
+          <div style="width:8px;height:8px;background:var(--teal);border-radius:50%;animation:blink 1.4s infinite;"></div>
+          <span style="font-family:var(--fmono);font-size:.68rem;color:var(--muted);">LIVE SIGNAL DETECTION</span>
+        </div>
+        <div style="display:flex;gap:1.2rem;margin-top:.65rem;">
+          <div style="text-align:center;">
+            <div style="font-family:var(--fmono);font-weight:700;font-size:1.1rem;color:var(--warn);">12</div>
+            <div style="font-size:.7rem;color:var(--muted);">고위험</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:var(--fmono);font-weight:700;font-size:1.1rem;color:#d4a017;">34</div>
+            <div style="font-size:.7rem;color:var(--muted);">중위험</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:var(--fmono);font-weight:700;font-size:1.1rem;color:var(--teal);">54</div>
+            <div style="font-size:.7rem;color:var(--muted);">저위험</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     PROBLEM
+════════════════════════════════ -->
+<section id="problem" class="problem-bg">
+  <div class="container">
+    <div class="section-label">문제 현황</div>
+    <div class="section-title">중도탈락은 매년 증가 중</div>
+    <p class="section-desc">KDT 중도탈락 인원은 2021년 681명에서 2024년 3,485명으로 5배 증가했습니다.</p>
+    <table class="dropout-table">
+      <thead>
+        <tr><th>연도</th><th>훈련인원</th><th>중도이탈</th><th>이탈률</th><th>추이</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2021</td><td>약 3,500명</td><td>681명</td><td>19.5%</td>
+            <td><div class="rate-bar"><div class="rate-track"><div class="rate-fill" style="width:98%"></div></div></div></td></tr>
+        <tr><td>2022</td><td>약 12,700명</td><td>1,529명</td><td>12.0%</td>
+            <td><div class="rate-bar"><div class="rate-track"><div class="rate-fill" style="width:60%"></div></div></div></td></tr>
+        <tr><td>2023</td><td>약 34,400명</td><td>2,479명</td><td>7.2%</td>
+            <td><div class="rate-bar"><div class="rate-track"><div class="rate-fill" style="width:36%"></div></div></div></td></tr>
+        <tr><td>2024</td><td>약 42,000명</td><td>3,485명</td><td>8.3%</td>
+            <td><div class="rate-bar"><div class="rate-track"><div class="rate-fill" style="width:41%"></div></div></div></td></tr>
+        <tr><td>2025 계획</td><td>45,125명</td><td>3,700~3,900 예상</td><td>8~9%</td>
+            <td><div class="rate-bar"><div class="rate-track"><div class="rate-fill" style="width:43%;background:var(--teal)"></div></div><span style="font-size:.67rem;color:var(--teal);margin-left:.4rem;">개입시</span></div></td></tr>
+      </tbody>
+    </table>
+    <div class="problem-grid">
+      <div class="problem-card"><div class="icon">📉</div><h4>전공·비전공 학습 격차</h4><p>초기 속도와 오답 누적으로 자신감이 무너지면서 AI 분야 취업률 급락으로 이어집니다.</p></div>
+      <div class="problem-card"><div class="icon">📱</div><h4>세대·디지털 접근성</h4><p>LMS 부담과 입력 장벽이 중장년·비전공자의 이탈을 가속합니다.</p></div>
+      <div class="problem-card"><div class="icon">📍</div><h4>지역·연계 인프라</h4><p>폴리텍 취업률 81.7% vs KDT 63.8% — 지방 연계 네트워크 격차가 큽니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     HOW IT WORKS
+════════════════════════════════ -->
+<section id="how" class="how-bg">
+  <div class="container">
+    <div class="section-label">작동 방식</div>
+    <div class="section-title">4단계 자동 개입 파이프라인</div>
+    <p class="section-desc">데이터 수집부터 인간 코치 에스컬레이션까지, 명확한 자동화 범위 안에서 선제 개입합니다.</p>
+    <div class="land-pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num">STEP 01</div>
+        <h4>데이터 수집</h4>
+        <p>LMS 로그, 출결, 과제 제출, 카카오톡 응답률, 기관 CSV — 식별·행동 분리 저장</p>
+        <span class="pipe-tag">실시간 + 배치</span>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">STEP 02</div>
+        <h4>위험 탐지</h4>
+        <p>규칙 임계값 + XGBoost/LightGBM 앙상블로 학습자별 위험 점수 산출</p>
+        <span class="pipe-tag">규칙 + ML</span>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">STEP 03</div>
+        <h4>자동 개입</h4>
+        <p>짧은 격려 메시지, RAG 기반 설명, 쉬운 복습 문제 1개 자동 발송</p>
+        <span class="pipe-tag">카카오톡 · RAG</span>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">STEP 04</div>
+        <h4>코치 에스컬</h4>
+        <p>고위험·3회 이상 무응답 구간에서만 인간 코치로 연결. 감사 로그 전체 기록</p>
+        <span class="pipe-tag">Human-in-the-loop</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     FEATURES
+════════════════════════════════ -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">핵심 기능</div>
+    <div class="section-title">MVP 모듈 구성</div>
+    <p class="section-desc">1단계에서는 자동화 범위를 명확히 제한하고, 효과 검증 후 단계적으로 확장합니다.</p>
+    <div class="features-grid">
+      <div class="feature-card featured">
+        <div>
+          <div class="feature-icon">📊</div>
+          <h3>운영자·코치 대시보드</h3>
+          <p>위험 점수 분포, 에스컬레이션 큐, 개입 효과 스냅샷, 수동 재분류, 감사 로그 조회를 한 화면에서 관리합니다.</p>
+          <div style="display:flex;gap:.4rem;margin-top:.9rem;flex-wrap:wrap;">
+            <span style="font-size:.72rem;color:rgba(245,243,238,.5);background:rgba(255,255,255,.07);padding:.18rem .55rem;border-radius:6px;">위험 분포</span>
+            <span style="font-size:.72rem;color:rgba(245,243,238,.5);background:rgba(255,255,255,.07);padding:.18rem .55rem;border-radius:6px;">에스컬 큐</span>
+            <span style="font-size:.72rem;color:rgba(245,243,238,.5);background:rgba(255,255,255,.07);padding:.18rem .55rem;border-radius:6px;">오판 재분류</span>
+            <span style="font-size:.72rem;color:rgba(245,243,238,.5);background:rgba(255,255,255,.07);padding:.18rem .55rem;border-radius:6px;">감사 로그</span>
+          </div>
+        </div>
+        <div class="mini-dash">
+          <div class="dash-row"><span style="color:rgba(245,243,238,.6)">학습자 B</span><span class="risk-pill rp-high">고위험</span><div class="score-bar"><div class="score-fill" style="width:89%;background:var(--warn)"></div></div><span style="color:rgba(245,243,238,.4);font-size:.72rem">0.89</span></div>
+          <div class="dash-row"><span style="color:rgba(245,243,238,.6)">학습자 F</span><span class="risk-pill rp-mid">중위험</span><div class="score-bar"><div class="score-fill" style="width:62%;background:#f5c842"></div></div><span style="color:rgba(245,243,238,.4);font-size:.72rem">0.62</span></div>
+          <div class="dash-row"><span style="color:rgba(245,243,238,.6)">학습자 K</span><span class="risk-pill rp-low">저위험</span><div class="score-bar"><div class="score-fill" style="width:24%;background:var(--teal)"></div></div><span style="color:rgba(245,243,238,.4);font-size:.72rem">0.24</span></div>
+          <div class="dash-row"><span style="color:rgba(245,243,238,.6)">학습자 M</span><span class="risk-pill rp-low">저위험</span><div class="score-bar"><div class="score-fill" style="width:18%;background:var(--teal)"></div></div><span style="color:rgba(245,243,238,.4);font-size:.72rem">0.18</span></div>
+        </div>
+      </div>
+      <div class="feature-card"><div class="feature-icon">🤖</div><h3>페이스메이커 엔진</h3><p>접속 감소·오답 연속·메신저 무응답 등 행동 신호를 조합해 이탈 전조를 조기에 포착합니다. 3~4주차 집중 관리 구간에서 알림 빈도를 높입니다.</p></div>
+      <div class="feature-card"><div class="feature-icon">💬</div><h3>메신저 학습 에이전트</h3><p>카카오톡 채널로 짧은 격려와 복습 1문제를 발송합니다. RAG 기반 문답으로 단원별 설명을 제공하며, 허용 범위 내에서만 LLM이 동작합니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     PILOT
+════════════════════════════════ -->
+<section id="pilot" class="how-bg">
+  <div class="container">
+    <div class="section-label">파일럿 설계</div>
+    <div class="section-title">8주 A/B 실증 모델</div>
+    <p class="section-desc">1개 KDT 과정 약 100명 규모로 시작해 효과 검증 후 확대합니다.</p>
+    <div class="pilot-grid">
+      <div class="pilot-card">
+        <div class="pilot-card-lbl">실증 설계</div>
+        <table class="pilot-table">
+          <tr><td>규모</td><td>약 100명</td></tr>
+          <tr><td>기간</td><td>8주</td></tr>
+          <tr><td>배정</td><td>무작위 / 준무작위</td></tr>
+          <tr><td>유의수준</td><td>사전 등록·명시</td></tr>
+        </table>
+      </div>
+      <div class="pilot-card">
+        <div class="pilot-card-lbl">측정 지표</div>
+        <div style="margin-bottom:.7rem;">
+          <div style="font-size:.78rem;font-weight:700;color:var(--blue);margin-bottom:.35rem;">1차 지표</div>
+          <p style="font-size:.88rem;color:var(--muted);margin:0;">재접속률 · 중도탈락률 · 과제 완료율</p>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:.7rem;">
+          <div style="font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.35rem;">2차 지표</div>
+          <p style="font-size:.88rem;color:var(--muted);margin:0;">수료율 · 만족도 설문 · 부담감 응답</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     ROADMAP
+════════════════════════════════ -->
+<section id="roadmap">
+  <div class="container">
+    <div class="section-label">단계별 추진 전략</div>
+    <div class="section-title">4단계 확장 로드맵</div>
+    <p class="section-desc">MVP 검증부터 운영 표준화까지 12개월+ 확산 계획입니다.</p>
+    <div class="roadmap-grid">
+      <div class="roadmap-card"><div class="roadmap-head"><div class="roadmap-num">1</div><span>MVP 실증</span><span class="roadmap-period">0~3개월</span></div><div class="roadmap-body"><ul><li>1개 과정 · 약 100명</li><li>규칙 + XGBoost 탐지</li><li>CSV 연계 · 대시보드</li><li>기준선 지표 수집</li></ul></div></div>
+      <div class="roadmap-card"><div class="roadmap-head"><div class="roadmap-num">2</div><span>효과 검증</span><span class="roadmap-period">3~6개월</span></div><div class="roadmap-body"><ul><li>카카오톡 + RAG 본격화</li><li>A/B 비교 분석</li><li>모델 고도화</li><li>기관 2~3곳 확대</li></ul></div></div>
+      <div class="roadmap-card"><div class="roadmap-head"><div class="roadmap-num">3</div><span>접근성 확대</span><span class="roadmap-period">6~12개월</span></div><div class="roadmap-body"><ul><li>음성 입력(Whisper)</li><li>다기관 연동</li><li>시계열 모델 검토</li><li>HRD-Net API 협의</li></ul></div></div>
+      <div class="roadmap-card"><div class="roadmap-head"><div class="roadmap-num">4</div><span>운영 표준화</span><span class="roadmap-period">12개월+</span></div><div class="roadmap-body"><ul><li>운영 표준화 패키지</li><li>정책 피드백 루프</li><li>타 직업훈련 확산</li><li>사업화 세부화</li></ul></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     POLICY
+════════════════════════════════ -->
+<section class="how-bg">
+  <div class="container">
+    <div class="section-label">정책 연계</div>
+    <div class="section-title">주요 정책과의 접점</div>
+    <p class="section-desc">과기부·고용부 핵심 정책 방향과 맞닿아 있습니다.</p>
+    <div class="policy-grid">
+      <div class="policy-card"><div class="tag">K-Digital Training</div><h4>수료·완주 KPI</h4><p>2025년 예산 4,781억, 45,125명 규모 KDT에 LMS 연계 선제 개입으로 수료·완주 KPI 개선에 직접 기여합니다.</p></div>
+      <div class="policy-card"><div class="tag">내일배움카드 · HRD-Net</div><h4>도입 장벽 완화</h4><p>NIA 디지털 교육 누적 수강 행동 데이터 기반 개인화. CSV 병행으로 API 의존도를 낮추고 초기 도입 장벽을 최소화합니다.</p></div>
+      <div class="policy-card"><div class="tag">과기부 AI·디지털</div><h4>에이전트 모델 확산</h4><p>2025년 과기부 AI·디지털 예산 8,800억 방향과 연계. 교육용 에이전트 레퍼런스 모델로 타 직업훈련까지 확산 가능합니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     GOVERNANCE
+════════════════════════════════ -->
+<section id="governance" class="gov-bg">
+  <div class="container">
+    <div class="section-label">개인정보 · 거버넌스</div>
+    <div class="section-title">안전한 AI 개입 원칙</div>
+    <p class="section-desc">PIPA 준수 하에 최소 수집·분리 저장·인간 검토를 기본으로 설계했습니다.</p>
+    <div class="checklist">
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>최소수집 원칙</h5><p>목적별 항목·보존기한 명시. 목적 외 이용 금지. PIPA 동의·열람·파기 절차 문서화.</p></div></div>
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>분리 저장 · RBAC</h5><p>학습 행동 로그와 식별정보 분리 저장. 기관별 역할 기반 접근권한 통제.</p></div></div>
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>감사 추적</h5><p>개입·상담 로그 전체 기록. 개입 ID·시각·담당자 감사 로그 조회 경로 제공.</p></div></div>
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>Human-in-the-loop</h5><p>고위험 자동 조치 전후 코치 확인 경로 필수. 과도한 자동화 리스크를 구조적으로 통제.</p></div></div>
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>오판 대응 절차</h5><p>수동 재분류, 이의 제기 경로, 월간 모델·룰 리뷰, 오판 피드백 재학습 큐.</p></div></div>
+      <div class="check-item"><div class="check-icon">✓</div><div><h5>LLM 품질 관리</h5><p>RAG·템플릿 우선, 이상응답 필터, 허용 도구 범위 내에서만 LLM 동작.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="section-label">과학기술정보통신부 × 모두의아이디어 공모전</div>
+    <div class="section-title">AI 에이전트로 일상을 바꿉니다</div>
+    <p class="section-desc">국비훈련 학습자의 완주를 돕고, 데이터 기반 선제 개입으로 KDT 훈련 성과를 높입니다.<br>아래에서 에이전트 사이클을 직접 체험해보세요.</p>
+    <div class="cta-btns">
+      <a class="btn-primary" href="#simulator">▶ 에이전트 시뮬레이터 체험하기</a>
+      <a class="btn-secondary" href="#problem">현황 데이터 다시 보기</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════
+     ★★★ SIMULATOR — 마지막 체험 ★★★
+════════════════════════════════ -->
+<section id="simulator" class="how-bg">
+  <div class="container">
+
+    <!-- 섹션 헤더 (박스 바깥) -->
+    <div class="section-label" style="display:flex;align-items:center;gap:.5rem;">
+      <span style="width:7px;height:7px;background:var(--teal);border-radius:50%;display:inline-block;animation:blink 1.4s infinite;flex-shrink:0;"></span>
+      라이브 시뮬레이터
+    </div>
+    <div class="section-title">에이전트 사이클 직접 체험하기</div>
+    <p class="section-desc">학습자를 선택하고 ▶ 실행 버튼을 누르면 Perceive → Reason → Plan → Act 사이클이 실시간으로 작동합니다</p>
+
+    <!-- ★★★ SIM BOX 시작 ★★★ -->
+    <div class="sim-box">
+
+      <!-- 박스 상단 컨트롤 바 (macOS 스타일) -->
+      <div class="sim-box-bar">
+        <div class="sim-box-dots">
+          <div class="sim-box-dot red"></div>
+          <div class="sim-box-dot yellow"></div>
+          <div class="sim-box-dot green"></div>
+        </div>
+        <span class="sim-box-title">AI EduMentor — Agent Cycle Simulator</span>
+
+        <!-- 학습자 탭 -->
+        <div class="sim-box-tabs" id="stuTabsBox">
+          <button class="stu-btn active" onclick="selectStu(0,this)">😔 김민준</button>
+          <button class="stu-btn"        onclick="selectStu(1,this)">😐 이서연</button>
+          <button class="stu-btn"        onclick="selectStu(2,this)">😊 박지호</button>
+        </div>
+
+        <!-- ▶ 실행 버튼 -->
+        <button id="btnRunBox" onclick="runSim()">
+          <div class="spinner"></div>
+          <span id="btnTextBox">▶ 에이전트 사이클 실행</span>
+        </button>
+      </div>
+
+      <!-- 박스 안쪽 콘텐츠 -->
+      <div class="sim-box-body">
+        <div class="sim-wrap">
+
+          <!-- ── 학습자 카드 ── -->
+          <div class="stu-card">
+            <div class="stu-avatar" id="stuAvatar">😔</div>
+            <div class="stu-info">
+              <h3 id="stuName">김민준</h3>
+              <p id="stuDesc">최근 7일 학습 패턴 이상 감지 · Python 기초 과정 수강 중 (3주차)</p>
+            </div>
+            <div class="s-risk-badge s-risk-high" id="riskBadge">⚠ 이탈 위험 HIGH</div>
+          </div>
+
+          <!-- ── 메트릭 3칸 ── -->
+          <div class="sim-metrics">
+            <div class="smc">
+              <div class="smc-lbl">오답 패턴</div>
+              <div class="smc-val cv-red" id="m1">73%</div>
+              <div class="smc-sub">동일 유형 반복 오류</div>
+              <div class="smc-ico">📉</div>
+            </div>
+            <div class="smc">
+              <div class="smc-lbl">학습 속도</div>
+              <div class="smc-val cv-yellow" id="m2">-42%</div>
+              <div class="smc-sub">지난 주 대비 저하</div>
+              <div class="smc-ico">🐢</div>
+            </div>
+            <div class="smc">
+              <div class="smc-lbl">접속 빈도</div>
+              <div class="smc-val cv-red" id="m3">2회</div>
+              <div class="smc-sub">최근 7일 기준</div>
+              <div class="smc-ico">📵</div>
+            </div>
+          </div>
+
+          <!-- ── 4단계 파이프라인 ── -->
+          <div class="sim-pipeline">
+            <div class="sps active" id="step0">
+              <div class="sps-num"><span class="sps-dot"></span> STEP 01</div>
+              <div class="sps-title">인식<small>Perceive</small></div>
+              <ul class="sps-items">
+                <li>LMS 접속·체류 로그</li>
+                <li>오답 연속 감지</li>
+                <li>메신저 응답률</li>
+                <li>3~4주차 집중 구간</li>
+              </ul>
+            </div>
+            <div class="sps" id="step1">
+              <div class="sps-num"><span class="sps-dot"></span> STEP 02</div>
+              <div class="sps-title">판단<small>Reason</small></div>
+              <ul class="sps-items">
+                <li>XGBoost 위험점수</li>
+                <li>임계값 초과 판단</li>
+                <li>이탈 등급 분류</li>
+                <li>에스컬레이션 확인</li>
+              </ul>
+            </div>
+            <div class="sps" id="step2">
+              <div class="sps-num"><span class="sps-dot"></span> STEP 03</div>
+              <div class="sps-title">계획<small>Plan</small></div>
+              <ul class="sps-items">
+                <li>RAG 맞춤 메시지</li>
+                <li>복습 1문제 선정</li>
+                <li>코치 연계 결정</li>
+                <li>개입 로그 등록</li>
+              </ul>
+            </div>
+            <div class="sps" id="step3">
+              <div class="sps-num"><span class="sps-dot"></span> STEP 04</div>
+              <div class="sps-title">실행<small>Act</small></div>
+              <ul class="sps-items">
+                <li>카카오톡 채널 발송</li>
+                <li>복습 문제 제공</li>
+                <li>코치 자동 연결</li>
+                <li>기록·재평가</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- ── 3열 메인 ── -->
+          <div class="sim-grid">
+
+            <!-- 좌: 판단 분석 + 개입 방식 -->
+            <div class="col-analysis">
+              <div class="spanel" style="margin-bottom:.9rem">
+                <div class="spanel-title"><span class="spbar spbar-purple"></span> 판단 분석</div>
+                <div class="prog-row">
+                  <div class="prog-lbl"><span>이탈 위험도</span><span id="pr1">87%</span></div>
+                  <div class="prog-track"><div class="prog-fill fill-red" id="pf1" style="width:87%"></div></div>
+                </div>
+                <div class="prog-row">
+                  <div class="prog-lbl"><span>취약 개념 점유율</span><span id="pr2">74%</span></div>
+                  <div class="prog-track"><div class="prog-fill fill-purple" id="pf2" style="width:74%"></div></div>
+                </div>
+                <div class="prog-row">
+                  <div class="prog-lbl"><span>개입 긴급도</span><span id="pr3">95%</span></div>
+                  <div class="prog-track"><div class="prog-fill fill-red" id="pf3" style="width:95%"></div></div>
+                </div>
+                <div class="prog-row">
+                  <div class="prog-lbl"><span>커리큘럼 최적화</span><span id="pr4">61%</span></div>
+                  <div class="prog-track"><div class="prog-fill fill-blue" id="pf4" style="width:61%"></div></div>
+                </div>
+              </div>
+              <div class="spanel">
+                <div class="spanel-title"><span class="spbar spbar-cyan"></span> 개입 방식</div>
+                <div class="ivc selected" id="iv0" onclick="selIV(0)">
+                  <h4>🔔 카카오톡 즉시 알림</h4>
+                  <p>이탈 위험 임계값 초과 시 즉각 격려 메시지를 발송합니다</p>
+                  <span class="ivc-tag chip-teal">긴급 개입 · 추천</span>
+                </div>
+                <div class="ivc" id="iv1" onclick="selIV(1)">
+                  <h4>📚 RAG 복습 문제 제공</h4>
+                  <p>취약 단원 중심으로 쉬운 복습 1문제를 자동 선정합니다</p>
+                  <span class="ivc-tag chip-blue">학습 재개 유도</span>
+                </div>
+                <div class="ivc" id="iv2" onclick="selIV(2)">
+                  <h4>👩‍🏫 Human-in-the-loop</h4>
+                  <p>고위험·무응답 구간에서만 인간 코치로 에스컬레이션합니다</p>
+                  <span class="ivc-tag chip-purple">코치 심층 케어</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 중앙: 카카오톡 출력 -->
+            <div class="col-kakao">
+              <div class="spanel">
+                <div class="spanel-title"><span class="spbar spbar-teal"></span> 실행 출력 — 카카오톡 채널</div>
+                <div class="kakao-wrap">
+                  <div class="kakao-hd">
+                    <div class="kakao-ico">💬</div>
+                    <div>
+                      <div class="kakao-sender">AI EduMentor 채널</div>
+                      <div class="kakao-time" id="kakaoTime">▶ 실행 후 표시됩니다</div>
+                    </div>
+                  </div>
+                  <div class="kakao-bubble" id="kakaoBubble">에이전트 사이클을 실행하면<br>AI가 생성한 학습자 맞춤형<br>개입 메시지가 여기에 표시됩니다.</div>
+                  <button class="kakao-btn" id="kakaoBtn" onclick="confirmMsg()" style="display:none">✅ 확인했어요</button>
+                </div>
+                <div class="int-summary" id="intSummary" style="display:none">
+                  <div class="is-title">개입 결과 요약</div>
+                  <div id="intRows"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 우: 에이전트 로그 -->
+            <div class="col-log">
+              <div class="spanel">
+                <div class="spanel-title"><span class="spbar spbar-blue"></span> 실시간 에이전트 로그</div>
+                <div class="terminal" id="terminal">
+                  <div class="log-line">
+                    <span class="log-time">--:--</span>
+                    <span class="log-tag log-p">PERCEIVE</span>
+                    <span class="log-msg">에이전트 대기 중 — ▶ 실행 버튼을 누르세요</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /sim-grid -->
+
+          <!-- 결과 패널 -->
+          <div class="result-panel" id="resultPanel">
+            <h3>✅ 사이클 완료 — 실행 결과 요약</h3>
+            <div id="resultGrid"></div>
+            <div class="spanel-title" style="margin:.9rem 0 .55rem">
+              <span class="spbar spbar-teal"></span> 실행된 액션
+            </div>
+            <div class="action-chips" id="actionChips"></div>
+          </div>
+
+        </div><!-- /sim-wrap -->
+      </div><!-- /sim-box-body -->
+    </div><!-- /sim-box ★★★ -->
+
+  </div><!-- /container -->
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <strong>AI EduMentor</strong> · K-Digital Training / 내일배움카드 연계 지능형 학습 멘토 에이전트 플랫폼<br>
+  과기부 공모전 제출 마감 2026.04.15 · 위험 탐지 엔진 + 개입 자동화 + Human-in-the-loop
+</footer>
+
+<!-- ════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════ -->
+<script>
+/* ── 학습자 데이터 ── */
+const students = [
+  {
+    name:"김민준",emoji:"😔",
+    desc:"최근 7일 학습 패턴 이상 감지 · Python 기초 과정 수강 중 (3주차)",
+    risk:"⚠ 이탈 위험 HIGH",riskCls:"s-risk-high",
+    m1:"73%",m2:"-42%",m3:"2회",
+    pr:[87,74,95,61],pv:["87%","74%","95%","61%"],
+    fills:["fill-red","fill-purple","fill-red","fill-blue"],
+    logs:[
+      {t:"log-p",l:"PERCEIVE",m:"학습자 [김민준] LMS 행동 데이터 스캔 시작"},
+      {t:"log-p",l:"PERCEIVE",m:"접속 빈도 급감: 7일간 2회 (기준 14회 대비 -86%)"},
+      {t:"log-p",l:"PERCEIVE",m:"과제 오답 연속: 동일 유형 73% 오류율"},
+      {t:"log-p",l:"PERCEIVE",m:"메신저 응답률 0% — 3일간 무응답 (3~4주차 집중 구간)"},
+      {t:"log-r",l:"REASON",  m:"XGBoost 위험점수 산출 중... 0.87 (HIGH)"},
+      {t:"log-r",l:"REASON",  m:"임계값(0.75) 초과 → 즉각 개입 결정"},
+      {t:"log-r",l:"REASON",  m:"취약 단원: [Python 반복문] [함수 설계]"},
+      {t:"log-pl",l:"PLAN",   m:"RAG 기반 맞춤 격려 메시지 생성 완료"},
+      {t:"log-pl",l:"PLAN",   m:"쉬운 복습 1문제 자동 선정: Python 반복문"},
+      {t:"log-pl",l:"PLAN",   m:"24시간 무응답 시 코치 에스컬레이션 예약"},
+      {t:"log-a", l:"ACT",    m:"✅ 카카오톡 채널 메시지 발송 완료"},
+      {t:"log-a", l:"ACT",    m:"✅ 복습 1문제 제공 완료"},
+      {t:"log-a", l:"ACT",    m:"✅ 개입 결과 기록 — 재평가 예약 24시간 후"},
+    ],
+    kakao:`안녕하세요, <strong>김민준</strong>님! 🌟\n\n최근 학습이 좀 힘드셨나요?\nAI 에이전트가 분석한 결과, <strong>Python 반복문</strong> 부분에서 어려움이 감지됐어요.\n\n👉 오늘의 <strong>맞춤 복습 1문제</strong>를 준비했어요. 5분이면 충분해요! 💪\n\n무응답 시 코치 선생님이 직접 연락드릴 예정입니다.`,
+    intRows:[{k:"개입 ID",v:"#INT-KDT-001"},{k:"위험점수",v:"0.87 → 개입"},{k:"발송 채널",v:"카카오톡"},{k:"재평가",v:"24시간 후"}],
+    actions:[{l:"카카오톡 알림 발송",c:"chip-teal"},{l:"Python 복습 1문제",c:"chip-blue"},{l:"코치 연계 예약",c:"chip-purple"},{l:"개입 로그 등록",c:"chip-yellow"}],
+    results:[{k:"개입 방식",v:"메시지+복습"},{k:"예측 복귀율",v:"71%"},{k:"위험점수",v:"0.87 (HIGH)"},{k:"다음 사이클",v:"24시간 후"}]
+  },
+  {
+    name:"이서연",emoji:"😐",
+    desc:"학습 속도 정체 · AI 머신러닝 과정 수강 중 (4주차)",
+    risk:"⚡ 정체 위험 MID",riskCls:"s-risk-mid",
+    m1:"48%",m2:"-18%",m3:"9회",
+    pr:[52,68,55,78],pv:["52%","68%","55%","78%"],
+    fills:["fill-purple","fill-purple","fill-purple","fill-blue"],
+    logs:[
+      {t:"log-p",l:"PERCEIVE",m:"학습자 [이서연] LMS 행동 데이터 스캔 시작"},
+      {t:"log-p",l:"PERCEIVE",m:"접속 빈도 정상: 7일간 9회 유지"},
+      {t:"log-p",l:"PERCEIVE",m:"학습 진도 정체: 3주째 동일 레벨 (오답률 48%)"},
+      {t:"log-r",l:"REASON",  m:"XGBoost 위험점수: 0.52 (MEDIUM)"},
+      {t:"log-r",l:"REASON",  m:"임계값 미만 → 예방적 개입 권장"},
+      {t:"log-r",l:"REASON",  m:"취약 영역: [머신러닝 수학] [모델 평가 지표]"},
+      {t:"log-pl",l:"PLAN",   m:"RAG 기반 난이도 상향 메시지 생성"},
+      {t:"log-pl",l:"PLAN",   m:"도전 과제 1문제 선정"},
+      {t:"log-a", l:"ACT",    m:"✅ 카카오톡 채널 메시지 발송 완료"},
+      {t:"log-a", l:"ACT",    m:"✅ 도전 문제 세트 제공 완료"},
+    ],
+    kakao:`안녕하세요, <strong>이서연</strong>님! 🎯\n\n꾸준히 접속하고 계시는군요, 대단해요! 👏\n\nAI 에이전트 분석 결과, <strong>모델 평가 지표</strong> 부분에서 한 단계 도약할 준비가 됐어요!\n\n🏆 오늘의 <strong>레벨업 도전 문제</strong>를 클리어하면 다음 단계로 진입해요!`,
+    intRows:[{k:"개입 ID",v:"#INT-KDT-002"},{k:"위험점수",v:"0.52 → 예방"},{k:"발송 채널",v:"카카오톡"},{k:"재평가",v:"48시간 후"}],
+    actions:[{l:"카카오톡 알림 발송",c:"chip-teal"},{l:"레벨업 도전 문제",c:"chip-blue"},{l:"성취 배지 활성화",c:"chip-yellow"},{l:"개입 로그 등록",c:"chip-purple"}],
+    results:[{k:"개입 방식",v:"난이도 상향"},{k:"예측 레벨업",v:"85% (2주)"},{k:"위험점수",v:"0.52 (MID)"},{k:"다음 사이클",v:"48시간 후"}]
+  },
+  {
+    name:"박지호",emoji:"😊",
+    desc:"우수 학습 진행 중 · 웹개발 풀스택 과정 수강 중 (2주차)",
+    risk:"✅ 정상 진행 LOW",riskCls:"s-risk-low",
+    m1:"12%",m2:"+28%",m3:"18회",
+    pr:[8,22,15,94],pv:["8%","22%","15%","94%"],
+    fills:["fill-teal","fill-teal","fill-teal","fill-blue"],
+    logs:[
+      {t:"log-p",l:"PERCEIVE",m:"학습자 [박지호] LMS 행동 데이터 스캔 시작"},
+      {t:"log-p",l:"PERCEIVE",m:"접속 빈도 우수: 7일간 18회"},
+      {t:"log-p",l:"PERCEIVE",m:"오답률 12% — 낮은 수준 유지 (우수)"},
+      {t:"log-r",l:"REASON",  m:"XGBoost 위험점수: 0.08 (LOW)"},
+      {t:"log-r",l:"REASON",  m:"임계값 미달 → 심화 콘텐츠 추천 모드"},
+      {t:"log-pl",l:"PLAN",   m:"심화 프로젝트 과제 설계 (풀스택 심화)"},
+      {t:"log-pl",l:"PLAN",   m:"개입 로그 등록: #INT-KDT-003 (심화 권장)"},
+      {t:"log-a", l:"ACT",    m:"✅ 심화 챌린지 과제 발송 완료"},
+      {t:"log-a", l:"ACT",    m:"✅ 우수 학습자 리더보드 등록 완료"},
+    ],
+    kakao:`안녕하세요, <strong>박지호</strong>님! 🚀\n\n정말 대단해요! 이번 주 학습 속도가 <strong>28% 향상</strong>됐어요!\n\nAI 에이전트가 당신 실력에 맞는 <strong>풀스택 심화 챌린지</strong>를 준비했어요.\n\n🏅 리더보드 현재 <strong>3위</strong>! 1위까지 단 2문제, 지금 도전해봐요!`,
+    intRows:[{k:"개입 ID",v:"#INT-KDT-003"},{k:"위험점수",v:"0.08 → 심화"},{k:"발송 채널",v:"카카오톡"},{k:"재평가",v:"72시간 후"}],
+    actions:[{l:"심화 챌린지 발송",c:"chip-blue"},{l:"리더보드 등록",c:"chip-teal"},{l:"멘토 매칭",c:"chip-purple"},{l:"배지 수여",c:"chip-yellow"}],
+    results:[{k:"개입 방식",v:"심화+보상"},{k:"예측 레벨업",v:"97% (1주)"},{k:"위험점수",v:"0.08 (LOW)"},{k:"다음 사이클",v:"72시간 후"}]
+  }
+];
+
+let cur=0, running=false;
+
+/* IntersectionObserver: simbar 표시/숨김 */
+const simSec = document.getElementById('simulator');
+const simbar = document.getElementById('simbar');
+const stuMob = document.getElementById('stuMobile');
+const obs = new IntersectionObserver(entries=>{
+  const vis = entries[0].isIntersecting;
+  simbar.style.display = vis ? 'flex' : 'none';
+  stuMob.style.display  = vis ? 'flex'  : 'none';
+},{threshold:0.05});
+obs.observe(simSec);
+
+/* 학습자 선택 */
+function syncTabs(idx){
+  document.querySelectorAll('#stuTabsDesktop .stu-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  document.querySelectorAll('#stuMobile .stu-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  document.querySelectorAll('#stuTabsBox .stu-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+}
+function selectStu(idx,el){cur=idx;syncTabs(idx);applyStudent(idx);}
+function selectStuAll(idx,el){cur=idx;syncTabs(idx);applyStudent(idx);}
+
+function applyStudent(idx){
+  const s=students[idx];
+  document.getElementById('stuAvatar').textContent=s.emoji;
+  document.getElementById('stuName').textContent=s.name;
+  document.getElementById('stuDesc').textContent=s.desc;
+  const rb=document.getElementById('riskBadge');
+  rb.textContent=s.risk; rb.className='s-risk-badge '+s.riskCls;
+  document.getElementById('m1').textContent=s.m1;
+  document.getElementById('m2').textContent=s.m2;
+  document.getElementById('m3').textContent=s.m3;
+  for(let i=0;i<4;i++){
+    document.getElementById('pr'+(i+1)).textContent=s.pv[i];
+    const pf=document.getElementById('pf'+(i+1));
+    pf.style.width=s.pr[i]+'%'; pf.className='prog-fill '+s.fills[i];
+  }
+  resetPipeline();
+  document.getElementById('resultPanel').classList.remove('show');
+  document.getElementById('intSummary').style.display='none';
+  document.getElementById('kakaoBubble').innerHTML='에이전트 사이클을 실행하면<br>AI가 생성한 학습자 맞춤형<br>개입 메시지가 여기에 표시됩니다.';
+  document.getElementById('kakaoBtn').style.display='none';
+  document.getElementById('kakaoTime').textContent='▶ 실행 후 표시됩니다';
+  clearTerm();
+  addLog('log-p','PERCEIVE','에이전트 대기 중 — ▶ 실행 버튼을 누르세요');
+}
+function resetPipeline(){
+  for(let i=0;i<4;i++){const el=document.getElementById('step'+i);el.classList.remove('active','done');}
+  document.getElementById('step0').classList.add('active');
+}
+function clearTerm(){document.getElementById('terminal').innerHTML='';}
+function addLog(tag,lbl,msg){
+  const t=document.getElementById('terminal');
+  const now=new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  const el=document.createElement('div');
+  el.className='log-line';
+  el.innerHTML=`<span class="log-time">${now}</span><span class="log-tag ${tag}">${lbl}</span><span class="log-msg">${msg}</span>`;
+  t.appendChild(el); t.scrollTop=t.scrollHeight;
+}
+function selIV(idx){document.querySelectorAll('.ivc').forEach((c,i)=>c.classList.toggle('selected',i===idx));}
+function confirmMsg(){document.getElementById('kakaoBtn').style.display='none';}
+
+async function runSim(){
+  if(running)return;
+  running=true;
+  /* 기존 상단 sticky 버튼 */
+  const btn=document.getElementById('btnRun');
+  if(btn){btn.classList.add('running'); btn.disabled=true; document.getElementById('btnText').textContent='실행 중...';}
+  /* 박스 안 버튼 */
+  const btnBox=document.getElementById('btnRunBox');
+  if(btnBox){btnBox.classList.add('running2'); btnBox.disabled=true; document.getElementById('btnTextBox').textContent='실행 중...';}
+
+  document.getElementById('resultPanel').classList.remove('show');
+  document.getElementById('intSummary').style.display='none';
+  clearTerm(); resetPipeline();
+
+  const s=students[cur];
+  const phases=[
+    {id:'step0',tag:'PERCEIVE',logs:s.logs.filter(l=>l.l==='PERCEIVE'),ms:620},
+    {id:'step1',tag:'REASON',  logs:s.logs.filter(l=>l.l==='REASON'),  ms:700},
+    {id:'step2',tag:'PLAN',    logs:s.logs.filter(l=>l.l==='PLAN'),    ms:700},
+    {id:'step3',tag:'ACT',     logs:s.logs.filter(l=>l.l==='ACT'),     ms:800},
+  ];
+  for(let pi=0;pi<phases.length;pi++){
+    for(let i=0;i<4;i++){const el=document.getElementById('step'+i);el.classList.remove('active','done');if(i<pi)el.classList.add('done');if(i===pi)el.classList.add('active');}
+    for(const l of phases[pi].logs){await wait(phases[pi].ms);addLog(l.t,l.l,l.m);}
+  }
+  for(let i=0;i<4;i++){document.getElementById('step'+i).classList.remove('active');document.getElementById('step'+i).classList.add('done');}
+  await wait(380);
+
+  const now=new Date();
+  document.getElementById('kakaoTime').textContent=now.toLocaleTimeString('ko-KR');
+  document.getElementById('kakaoBubble').innerHTML=s.kakao.replace(/\n/g,'<br>');
+  document.getElementById('kakaoBtn').style.display='block';
+  document.getElementById('kakaoBtn').textContent='✅ 확인했어요';
+
+  document.getElementById('intRows').innerHTML=s.intRows.map(r=>`<div class="is-row"><span>${r.k}</span><span class="is-val">${r.v}</span></div>`).join('');
+  document.getElementById('intSummary').style.display='block';
+
+  document.getElementById('resultGrid').innerHTML=s.results.map(r=>`<div class="res-item"><div class="res-k">${r.k}</div><div class="res-v">${r.v}</div></div>`).join('');
+  document.getElementById('actionChips').innerHTML=s.actions.map(a=>`<span class="chip ${a.c}">${a.l}</span>`).join('');
+  document.getElementById('resultPanel').classList.add('show');
+
+  if(btn){btn.classList.remove('running'); btn.disabled=false; document.getElementById('btnText').textContent='▶ 다시 실행';}
+  if(btnBox){btnBox.classList.remove('running2'); btnBox.disabled=false; document.getElementById('btnTextBox').textContent='▶ 다시 실행';}
+  running=false;
+}
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>
